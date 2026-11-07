@@ -41,14 +41,14 @@ public class ResultsWorker extends Worker {
       while((n=in.read(b))!=-1&&out.size()<1500000)out.write(b,0,n);
      }
      String html=out.toString(StandardCharsets.UTF_8.name());
-     // RunHigh places its aligned result rows inside PRE tags. Stripping tags with
-     // a single space loses the line structure, so avoid row-specific regex checks here.
      String normalized=Html.fromHtml(html,Html.FROM_HTML_MODE_LEGACY)
        .toString().replace((char)160,' ');
      String upper=normalized.toUpperCase(java.util.Locale.ROOT);
-     // Accept authentic results headers regardless of spacing, split layout or the
-     // precise number of athletes. JavaScript will validate parsed finishers too.
-     if(!(upper.contains("PLACE") && upper.contains("FINISHER") && upper.length()>800))continue;
+     // RunHigh uses both "ID# PLACE SCORE FINISHER" and
+     // "ID# POINTS FINISHER TIME", depending on race and publication stage.
+     // Cache the full authentic source when either is present; the UI parses rows.
+     if(!(upper.contains("FINISHER") && upper.contains("ID#")
+       && upper.length()>500 && (upper.contains("TIME") || upper.contains("PLACE"))))continue;
      boolean posted=prefs.getBoolean("posted_"+i,false);
      prefs.edit().putString("page_"+i,html).putBoolean("posted_"+i,true).apply();
      if(!posted)notifyPosted(context,i);
