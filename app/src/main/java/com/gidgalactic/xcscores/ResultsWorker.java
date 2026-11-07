@@ -41,11 +41,16 @@ public class ResultsWorker extends Worker {
       while((n=in.read(b))!=-1&&out.size()<1500000)out.write(b,0,n);
      }
      String html=out.toString(StandardCharsets.UTF_8.name());
-     String decoded=Html.fromHtml(html,Html.FROM_HTML_MODE_LEGACY).toString();
-     String sample=html.contains("<pre")?html.replaceAll("(?is)<[^>]+>"," "):decoded;
-     Matcher rows=Pattern.compile("(?m)^\\s*\\d+\\s+\\d+\\s+(?:\\d+\\s+)?[^\\r\\n]+?,\\s*\\d+\\*?\\s+").matcher(sample);
-     int count=0;while(rows.find()&&count<10)count++;
-     if(count<10||!html.contains("ID#"))continue;
+     // RunHigh places its aligned result rows inside PRE tags. Stripping tags with
+     // a single space loses the line structure, so avoid row-specific regex checks here.
+     String plain=Html.fromHtml(html.replaceAll("(?i)<br\\s*/?>","\\n")
+      .replaceAll("(?i)</(?:pre|div|p|tr)>","\\n"),Html.FROM_HTML_MODE_LEGACY).toString();
+     String normalized=plain.replace('\\u00a0',' ');
+     boolean hasHeader=normalized.matches("(?s).*\\bPLACE\\b.*\\b(?:FINISHER|NAME)\\b.*");
+     boolean hasResults=normalized.matches("(?s).*\\b(?:ID#|PLACE)\\b.*")
+      && (normalized.contains("FINISHER")||normalized.contains("Finisher"))
+      && normalized.length()>800;
+     if(!hasHeader && !hasResults)continue;
      boolean posted=prefs.getBoolean("posted_"+i,false);
      prefs.edit().putString("page_"+i,html).putBoolean("posted_"+i,true).apply();
      if(!posted)notifyPosted(context,i);
