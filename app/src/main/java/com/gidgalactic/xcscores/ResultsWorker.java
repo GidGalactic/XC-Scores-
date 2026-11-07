@@ -43,14 +43,12 @@ public class ResultsWorker extends Worker {
      String html=out.toString(StandardCharsets.UTF_8.name());
      // RunHigh places its aligned result rows inside PRE tags. Stripping tags with
      // a single space loses the line structure, so avoid row-specific regex checks here.
-     String plain=Html.fromHtml(html.replaceAll("(?i)<br\\s*/?>","\\n")
-      .replaceAll("(?i)</(?:pre|div|p|tr)>","\\n"),Html.FROM_HTML_MODE_LEGACY).toString();
-     String normalized=plain.replace('\\u00a0',' ');
-     boolean hasHeader=normalized.matches("(?s).*\\bPLACE\\b.*\\b(?:FINISHER|NAME)\\b.*");
-     boolean hasResults=normalized.matches("(?s).*\\b(?:ID#|PLACE)\\b.*")
-      && (normalized.contains("FINISHER")||normalized.contains("Finisher"))
-      && normalized.length()>800;
-     if(!hasHeader && !hasResults)continue;
+     String normalized=Html.fromHtml(html,Html.FROM_HTML_MODE_LEGACY)
+       .toString().replace((char)160,' ');
+     String upper=normalized.toUpperCase(java.util.Locale.ROOT);
+     // Accept authentic results headers regardless of spacing, split layout or the
+     // precise number of athletes. JavaScript will validate parsed finishers too.
+     if(!(upper.contains("PLACE") && upper.contains("FINISHER") && upper.length()>800))continue;
      boolean posted=prefs.getBoolean("posted_"+i,false);
      prefs.edit().putString("page_"+i,html).putBoolean("posted_"+i,true).apply();
      if(!posted)notifyPosted(context,i);
