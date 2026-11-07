@@ -45,6 +45,11 @@ public class MainActivity extends Activity {
    if(i<0||i>5)return "";
    return getSharedPreferences("race_cache",MODE_PRIVATE).getString("page_"+i,"");
   }
+  @JavascriptInterface public void openUpdates(){
+   runOnUiThread(()->startActivity(new android.content.Intent(
+      android.content.Intent.ACTION_VIEW,
+      android.net.Uri.parse("https://github.com/GidGalactic/XC-Scores-/actions/workflows/android-apk.yml"))));
+  }
   @JavascriptInterface public void checkNow(){
    new Thread(()->{
     ResultsWorker.downloadAll(getApplicationContext(),true);
