@@ -56,6 +56,7 @@ public class ResultsWorker extends Worker {
    }catch(Exception e){android.util.Log.w("XC Scores","Could not check "+NAMES[i],e);}
   }
   prefs.edit().putLong("last_check",System.currentTimeMillis()).apply();
+  UpdateChecker.checkInBackground(context);
  }
  static void notifyPosted(Context c,int i){
   NotificationManager nm=(NotificationManager)c.getSystemService(Context.NOTIFICATION_SERVICE);
