@@ -37,6 +37,7 @@ public class MainActivity extends Activity {
   PeriodicWorkRequest periodic=new PeriodicWorkRequest.Builder(ResultsWorker.class,15,TimeUnit.MINUTES).build();
   WorkManager.getInstance(this).enqueueUniquePeriodicWork("xc-results",ExistingPeriodicWorkPolicy.KEEP,periodic);
   web.loadUrl("file:///android_asset/index.html");
+  UpdateChecker.check(this,false);
  }
  @Override protected void onResume(){super.onResume();if(web!=null)web.evaluateJavascript("window.receiveCached&&window.receiveCached()",null);}
  @Override protected void onDestroy(){if(web!=null)web.destroy();super.onDestroy();}
@@ -46,9 +47,7 @@ public class MainActivity extends Activity {
    return getSharedPreferences("race_cache",MODE_PRIVATE).getString("page_"+i,"");
   }
   @JavascriptInterface public void openUpdates(){
-   runOnUiThread(()->startActivity(new android.content.Intent(
-      android.content.Intent.ACTION_VIEW,
-      android.net.Uri.parse("https://github.com/GidGalactic/XC-Scores-/actions/workflows/android-apk.yml"))));
+   UpdateChecker.check(MainActivity.this,true);
   }
   @JavascriptInterface public void checkNow(){
    new Thread(()->{
