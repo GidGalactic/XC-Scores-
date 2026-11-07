@@ -14,36 +14,31 @@ const $=x=>document.getElementById(x),esc=x=>String(x??'').replace(/[&<>"']/g,c=
 const num=x=>Number.isFinite(+x)?+x:Infinity;
 const seconds=s=>{let p=String(s||'').split(':').map(Number);return p.length===2?p[0]*60+p[1]:p.length===3?p[0]*3600+p[1]*60+p[2]:Infinity};
 function parseText(input){
- let text=input.replace(/\r/g,'').replace(/\u00a0/g,' ');
- let lines=text.split('\n');
- let marker=lines.findIndex(x=>/ID#\s+(?:PLACE\s+)?(?:SCORE|POINTS)\s+FINISHER/i.test(x));
- if(marker<0)marker=lines.findIndex(x=>/ID#\s+PLACE\s+SCORE/i.test(x));
- if(marker<0)return {athletes:[],teams:[],error:'Official finishers heading not recognized'};
- let athletes=[],teams=[];
+ const text=input.replace(/\r/g,'').replace(/\u00a0/g,' ');
+ const lines=text.split('\n');
+ let marker=lines.findIndex(x=>x.toUpperCase().includes('ID#') && /FINISHER/i.test(x));
+ if(marker<0)marker=lines.findIndex(x=>/PLACE\s+(?:SCORE\s+)?FINISHER/i.test(x));
+ if(marker<0)return {athletes:[],teams:[],error:'No individual finisher table'};
+ const header=lines[marker].toUpperCase();
+ let athletes=[],teams=[],teamFromHeader='';
  for(const line of lines.slice(0,marker)){
   const m=line.match(/^\s*(\d+)\*?\s+(.+?)\s{2,}(\d+)\s+.*?(\d+:\d+(?:\.\d+)?)\s+(\d+:\d+(?:\.\d+)?)\s*$/);
-  if(m){let label=m[2].trim(),district=(label.match(/\b(\d\d)$/)||[])[1]||'';
-   teams.push({rank:+m[1],name:label.replace(/\s+\d\d$/,'').trim(),points:+m[3],avg:m[4],spread:m[5],district});}
+  if(m){let label=m[2].trim(); teams.push({rank:+m[1],name:label.replace(/\s+\(\d+\)\s*$/,'').trim(),points:+m[3],avg:m[4],spread:m[5],district:''});}
  }
- const timePattern=/\d{1,2}:\d{2}(?:\.\d+)?/g;
- let teamFromHeader='';
+ const clock=/\b\d{1,2}:\d{2}(?:\.\d+)?\b/g;
  for(const raw of lines.slice(marker+1)){
   const section=raw.match(/^\s*\d+\.\s+(.+?)\s*$/);
-  if(section)teamFromHeader=section[1].replace(/\s+\d\d$/,'').trim();
-  // Supports both individual ranking tables and team-grouped finisher tables.
+  if(section)teamFromHeader=section[1].replace(/\s+\(\d+\)\s*$/,'').trim();
   let m=raw.trim().match(/^(\d+)\s+(\d+)\s+(?:(\d+)\s+)?(.+?),\s*(\d+)\*?\s+(.+)$/);
   if(!m)continue;
   const [,id,place,score,name,grade,rest]=m;
-  const ts=[...rest.matchAll(timePattern)];
+  let ts=[...rest.matchAll(clock)];
   if(ts.length<2)continue;
-  // The last two clock values are finish time and mile pace.
-  const pace=ts[ts.length-1],finish=ts[ts.length-2];
+  const finish=ts[ts.length-2],pace=ts[ts.length-1];
   let team=rest.slice(pace.index+pace[0].length).trim()||teamFromHeader;
-  if(!team || !/[A-Za-z]/.test(team))continue;
-  let district=(team.match(/\b(\d\d)$/)||[])[1]||'';
-  team=team.replace(/\s+\d\d$/,'').trim();
-  athletes.push({id:+id,place:+place,score:score?+score:null,name:name.trim(),
-     grade:+grade,time:finish[0],pace:pace[0],team,district,splits:[]});
+  if(!team||!/[A-Za-z]/.test(team))continue;
+  team=team.replace(/\s+\(\d+\)\s*$/,'').trim();
+  athletes.push({id:+id,place:+place,score:score?+score:null,name:name.trim(),grade:+grade,time:finish[0],pace:pace[0],team,splits:[]});
  }
  athletes=[...new Map(athletes.map(a=>[a.id,a])).values()].sort((a,b)=>a.place-b.place);
  return {athletes,teams,updated:text.match(/Last updated[^\n]*/i)?.[0]?.trim()||'Updated results'};
