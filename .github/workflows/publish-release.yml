@@ -1,0 +1,58 @@
+name: Publish signed Android update
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Verify permanent signing secrets
+        env:
+          XC_KEYSTORE_BASE64: ${{ secrets.XC_KEYSTORE_BASE64 }}
+          XC_KEYSTORE_PASSWORD: ${{ secrets.XC_KEYSTORE_PASSWORD }}
+          XC_KEY_ALIAS: ${{ secrets.XC_KEY_ALIAS }}
+          XC_KEY_PASSWORD: ${{ secrets.XC_KEY_PASSWORD }}
+        run: |
+          test -n "$XC_KEYSTORE_BASE64" || { echo "::error::Set XC_KEYSTORE_BASE64 repository secret"; exit 1; }
+          test -n "$XC_KEYSTORE_PASSWORD" || { echo "::error::Set XC_KEYSTORE_PASSWORD repository secret"; exit 1; }
+          test -n "$XC_KEY_ALIAS" || { echo "::error::Set XC_KEY_ALIAS repository secret"; exit 1; }
+          test -n "$XC_KEY_PASSWORD" || { echo "::error::Set XC_KEY_PASSWORD repository secret"; exit 1; }
+          printf '%s' "$XC_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/xc-release.jks"
+          echo "XC_KEYSTORE_PATH=$RUNNER_TEMP/xc-release.jks" >> "$GITHUB_ENV"
+      - name: Build signed release APK
+        env:
+          XC_KEYSTORE_PASSWORD: ${{ secrets.XC_KEYSTORE_PASSWORD }}
+          XC_KEY_ALIAS: ${{ secrets.XC_KEY_ALIAS }}
+          XC_KEY_PASSWORD: ${{ secrets.XC_KEY_PASSWORD }}
+        run: |
+          gradle :app:assembleRelease --stacktrace
+          test -s app/build/outputs/apk/release/app-release.apk
+          cp app/build/outputs/apk/release/app-release.apk XC-Scores.apk
+      - name: Validate tag and Android version
+        run: |
+          # The tag must equal versionName (e.g. v1.3).
+          V=$(sed -n "s/.*versionName '\([^']*\)'.*/\1/p" app/build.gradle | head -1)
+          test "v$V" = "$GITHUB_REF_NAME" || { echo "::error::Tag v$V required, found $GITHUB_REF_NAME"; exit 1; }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: XC-Scores-release-APK
+          path: XC-Scores.apk
+      - name: Publish public GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" XC-Scores.apk --title "XC Scores $GITHUB_REF_NAME" --notes "Android app update $GITHUB_REF_NAME. Download XC-Scores.apk and approve installation on your device." --verify-tag
+      - name: Clean temporary key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/xc-release.jks"
